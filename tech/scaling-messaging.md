@@ -1,8 +1,7 @@
 # A year of scaling a messaging service at a Startup
 
-If you don't yet know I work at a small startup Limechat.
-
-We are building E-commerce on Chat.
+>If you don't me already, I work at a small startup Limechat. <br>
+> We are building E-commerce on Chat.
 
 The word chat in this context means anything that can be done via messages will be done via messages. To deal with these messages we have built a service that facilitates the sending of messages and receiving status updates and incoming messages from the users.
 
