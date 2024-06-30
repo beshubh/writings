@@ -1,0 +1,20 @@
+title: Writings
+description: hey I am shubh!
+author: shubh
+theme: minima
+
+# URL settings
+url: "https://alias-pyking.github.io"
+baseurl: "/writings" # the subpath of your site, e.g. /blog
+
+# Permalinks
+permalink: /:year/:month/:day/:title/
+
+# Markdown settings
+markdown: kramdown
+
+# Minima theme settings
+minima:
+  social_links:
+    twitter: alias_shubh
+    github: your-github-username
