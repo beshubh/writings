@@ -1,12 +1,21 @@
+title: Shubh's Writings
+theme: minima
 
 # URL settings
 url: "https://alias-pyking.github.io"
-baseurl: "/writings" # the subpath of your site, e.g. /blog
+baseurl: "/writings" # the subpath of your site
 
 # Permalinks
-permalink: /:year/:month/:day/:title/
+permalink: /:categories/:year/:month/:day/:title/
 
 # Markdown settings
 markdown: kramdown
 
-theme: minima
+# Custom collections
+collections:
+  tech:
+    output: true
+    permalink: /:collection/:name/
+  life:
+    output: true
+    permalink: /:collection/:name/

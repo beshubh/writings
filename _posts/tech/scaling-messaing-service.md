@@ -1,3 +1,10 @@
+---
+layout: post
+title: "Scaling messaging service at a startup"
+date: 2024-07-01
+categories: tech
+---
+
 # An year of scaling a messaging service at a Startup
 
 If you don't yet know I work at a small startup Limechat.
