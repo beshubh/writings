@@ -1,4 +1,4 @@
-# An year of scaling a messaging service at a Startup
+# A year of scaling a messaging service at a Startup
 
 If you don't yet know I work at a small startup Limechat.
 
