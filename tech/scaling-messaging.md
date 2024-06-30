@@ -258,22 +258,22 @@ async function disPatchWebhook(jobData) {
 ```js
 async function disPatchWebhook(jobData) {
 	const { delay = 1000, retries = 0 } = jobData;
-	
+
 	try {
-			const res = await fetch('post', {
+		const res = await fetch('post', {
 				url: jobData.url,
 				body: jobData.parsedData,
 				timeout: 5000 // configuring request timeout for 5 seconds
-			});
+		});
 	} catch (error) {
 		if (retries < WEBHOOK_MAX_RETRIES) {
 			const nextDelay = delay * BACK_OFF_MULTIPLIER;
 			await addJobToQueue(
-			'webhook_dlq',
-			'dispatch_webhook',
-			{...jobData, retries: retries + 1, delay: nextDelay},
-			{ delay: delay} // delay the job by delay milliseconds.
-			)
+				'webhook_dlq',
+				'dispatch_webhook',
+				{...jobData, retries: retries + 1, delay: nextDelay},
+				{ delay: delay} // delay the job by delay milliseconds.
+			);
 		}
 	}
 }
@@ -290,25 +290,25 @@ const FAILURE_TIMEFRAME = 24 * 60 * 60 * 1000; // 24 hours
 const FAILURES_THRESHOLD = 20;
 
 export async function checkWebhookSubscriberStatus(subId: string) {
-  const subscriptionStatus = await redis.get(`webhook:sub:${subId}:status`);
-  return subscriptionStatus;
+	const subStatus = await redis.get(`webhook:sub:${subId}:status`);
+	return subStatus;
 }
 
 async function markWebhookSubscriberDead(subscriptionId: string) {
-  await redis.set(`webhook:sub:${subId}:status`, 'dead');
+	await redis.set(`webhook:sub:${subId}:status`, 'dead');	
 }
 
 export async function markWebhookSubscriberAlive(subId: string) {
-  await redis.set(`webhook:sub:${subId}:status`, 'alive');
-  await redis.del(`webhook:sub:${subId}:failures`);
+	await redis.set(`webhook:sub:${subId}:status`, 'alive');
+	await redis.del(`webhook:sub:${subId}:failures`);
 }
 
 async function incrementFailures(subId: string) {
-  const now = Date.now();
-  await redis.zadd(`webhook:sub:${subId}:failures`, now, now.toString());
-  await redis.zremrangebyscore(
-  `webhook:sub:${subId}:failures`, '-inf', now - FAILURE_TIMEFRAME);
-  return redis.zcard(`webhook:sub:${subId}:failures`);
+	const now = Date.now();
+	await redis.zadd(`webhook:sub:${subId}:failures`, now, now.toString());
+	await redis.zremrangebyscore(
+		`webhook:sub:${subId}:failures`, '-inf', now - FAILURE_TIMEFRAME);
+	return redis.zcard(`webhook:sub:${subId}:failures`);
 }
 
 async function disPatchWebhook(jobData) {
@@ -316,30 +316,30 @@ async function disPatchWebhook(jobData) {
 	const subStatus = await checkSubsriberStatus(subscriptionId);
 	if (subscriptionStatus === 'dead') {
 		logger.info(
-		'Subscription is dead, not dispatching webhook event to %s', url
+			'Subscription is dead, not dispatching webhook event to %s', url
 		);
 		return;
 	}
 	try {
-			const res = await fetch('post', {
-				url: jobData.url,
-				body: jobData.parsedData,
-				timeout: 5000 // configuring request timeout for 5 seconds
-			});
+		const res = await fetch('post', {
+			url: jobData.url,
+			body: jobData.parsedData,
+			timeout: 5000 // configuring request timeout for 5 seconds
+		});
 	} catch (error) {
 		const failures = await incrementFailures(subscriptionId);
-	    if (failures > FAILURES_THRESHOLD) {
-	      await markWebhookSubscriberDead(subscriptionId);
-	      return;
-	    }
+		if (failures > FAILURES_THRESHOLD) {
+			await markWebhookSubscriberDead(subscriptionId);
+			return;
+		}
 		if (retries < WEBHOOK_MAX_RETRIES) {
 			const nextDelay = delay * BACK_OFF_MULTIPLIER;
 			await addJobToQueue(
-			'webhook_dlq',
-			'dispatch_webhook',
-			{...jobData, retries: retries + 1, delay: nextDelay},
-			{ delay: delay} // delay the job by delay milliseconds.
-			)
+				'webhook_dlq',
+				'dispatch_webhook',
+				{...jobData, retries: retries + 1, delay: nextDelay},
+				{ delay: delay} // delay the job by delay milliseconds.
+			);
 		}
 	}
 }
