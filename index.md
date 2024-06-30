@@ -1,16 +1,16 @@
----
-layout: default
-title: Home
----
 
-# Hi, I am Shubh!
+### Hi I am shubh!
 
-## Tech Essays
-{% for post in site.tech %}
-- [{{ post.title }}]({{ post.url }})
-{% endfor %}
 
-## Life Essays
-{% for post in site.life %}
-- [{{ post.title }}]({{ post.url }})
-{% endfor %}
+**Tech**
+
+[Scaling Messaging Service](./tech/scaling-messaging.html)
+
+
+<br>
+<br>
+
+**Life**
+<br>
+
+NA

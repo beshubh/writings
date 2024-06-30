@@ -1,10 +1,3 @@
----
-layout: post
-title: "Scaling messaging service at a startup"
-date: 2024-07-01
-categories: tech
----
-
 # An year of scaling a messaging service at a Startup
 
 If you don't yet know I work at a small startup Limechat.
@@ -16,13 +9,13 @@ The word chat in this context means anything that can be done via messages will 
 These are just short anecdotes of how we went through it, it may help you in future.
 
 
-**First principle coding**
+**First principles coding** <br>
 While writing the code for the service we just focused on the first principles didn't think too much about optimizations. We were majorly focused on only writing clean code. Every function should be highly cohesive, code should be decoupled, we focused on building the top level interfaces required by this service and these interfaces should be segregated enough that if we had to let's say add new integration (currently we support whatsapp only) let's say instagram we didn't have to touch any existing file for the most part. 
 
-Sending of messages and processing of status updates via webhooks and then further sending those webhooks downstream to other services , all of this involves network we rarely do any CPU bound operation here, so we choose NodeJS to power the backend of this service.
+Sending of messages and processing of status updates via webhooks and then further sending those webhooks downstream to other services , all of this involves network IO, we rarely do any CPU bound operation here, so we chose NodeJS to power the backend of this service.
 
 
-Idempotency & Queuing systems
+**Idempotency & Queuing systems**
 
 This messaging service also supports sending of messages in bulk, a client can send as many as 500K messages at once using this bulk API.
 
@@ -30,7 +23,7 @@ Our first principles got us to the place where we were easily able to handle aro
 
 Example bulk API
 
-api/v1/messages
+`api/v1/messages`
 
 parameters:
  - type: [bulk, normal] default: normal
@@ -39,7 +32,7 @@ body:
 
 Processing 500k phone numbers synchronously is not an option, so when we receive the bulk request we create an object in the database attaching the file_url and queue a job in the background using bullmq to process the CSV and send messages.
 
-Quick refresher on pub-sub
+>**📢 Quick refresher on pub-sub**
 A pub sub system consists of three components a publisher, subscriber and a broker. Publisher publishes the messages(don't confuse it with message we send to user on whatsapp) broker takes this messages and delivers it to the subscribers. This mechanism in our case is powered by bullmq that uses redis as a broker.
 
 Basic property of these queuing systems 
@@ -78,13 +71,13 @@ First thing we can do to solve this is configuring bigger timeout for this job.
 await addJobToQueue('messages:bulk', 'process_bulk_job', data, { timeout: 300 }) // 300 seconds
 ```
 
-But this only solves for the timeout re-delivery problem that too assuming it finished under 300 seconds.
-If for some reason re-delivery happened we will still sitting ducks.
+But this only solves for the timeout re-delivery problem that too assuming it finishes under 300 seconds.
+If for some reason re-delivery happened after 300 seconds we will still sitting ducks.
 
 **Idempotency**
 An operation is idempotent if it has the same result no matter how many times it's applied.
 
-To make our processing idempotency we can introduce a parameter in our jobData document or relation `is_processed` we will mark this value as `true` once the all the messages are sent and at the start of process job we will check if this value is true or false if it's true we will terminate the job.
+To make our processing idempotency we can introduce a parameter in our jobData document or relation `isProcessed`, we will mark this value as `true` once all the messages are sent and at the start of process job we will check if this value is true or false if it's true we will terminate the job.
 
 ```js
 async function processBulkJob(jobId: string): Promise<void> {
@@ -109,11 +102,10 @@ async function processBulkJob(jobId: string): Promise<void> {
 
 Okay so now we have solved re-delivery problem with timeout and idempotency, but we still have a problem here
 
---------time----------------------------------------------------------->
+--------time-----------------------------------------------------------> <br>
 
--> Queue-->processing--fetch_phones--sending-----sending------------>completed.
-->------------------------re-delivery-->processing--fetch_phones--
-
+-> Queue-->processing--fetch_phones--sending-----sending------------>completed <br>
+->------------------------re-delivery-->processing--fetch_phones-- <br>
 
 As you can see, I have tried to demonstrate in above sorta visual. As processing of this job takes a lot of time... re-delivery can happen in the middle the execution of this job as well. To solve this issue we need to make sure that at a time there is only execution processBulkJob happening, we can introduce locks to solve for it. We can employ redis to handle the locking part.
 
@@ -145,7 +137,7 @@ async function processBulkJob(jobId: string): Promise<void> {
 
 With this we finally would be able to avoid all the problems of re-delivery, there is still margin for improvements but those are very rare cases, we have almost never encountered any such cases as of now.
 
-To solve for these rare cases though you can employ the idempotency at sendMessage level as well and only allow sending the messages that are still in pending state, as you will be updating the message status on each successful api call.
+To solve for these rare cases though you can employ the idempotency at sendMessage level as well and only allow sending the messages that are still in pending state, as you will be updating the message status on each successful api call. <br>
 
 
 **Beginner's guide to webhooks system**
@@ -154,21 +146,18 @@ A webhook is a way of communicating b/w servers. There are two server one is a p
 
 In our messaging service we need webhooks system to relay the status updates (sent, delivered, read, failed) of messages to our internal other systems like CRM, bot. A CRM uses these webhooks to show the incoming messages or to update the status of the message etc.
 
-![[Screenshot 2024-06-30 at 2.35.56 PM.png]]
-
-The double tick here indicates messages is delivered.
 
 
-**Building a webhooks server** 
+**Building a webhooks server**  <br>
 We can start simple, in our case we just relay the webhooks we receive at the messaging service server further downstream to our internal services (CRM, bot) and to public subscribers (some clients use this service for sending messages and receiving webhooks)
 
 The flow looks like this
 
 Whatsapp ----> Messaging Service ---> Parse webhook--> Dispatch ---> CRM, Bot, Public clients
+<br>
+We can start with something like below <br>
 
-We can start with something like below
-
-`/webhooks.handle-wa`
+`https://messaging.company.com/v1/webhooks.handle-wa`
 
 ```js
 
@@ -358,3 +347,8 @@ async function disPatchWebhook(jobData) {
  - With this implementation we have successfully dealt with dead servers as well.
  - To further solidify the implementation you can send an email alert to your clients that their webhook server is not responsive and we won't be sending any more webhooks to their endpoint.
  - We can also give the clients an option in the email to resurrect the dead subscriber of theirs, so when they have fixed the issue they can subscribe again.
+
+<br>
+<br>
+<br>
+<br>
