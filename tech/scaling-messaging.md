@@ -1,14 +1,15 @@
 # A year of scaling a messaging service at a Startup
 
->If you don't me already, I work at a small startup Limechat. <br>
+>If you don't know me already, I work at a small startup Limechat. <br>
 > We are building E-commerce on Chat.
 
 The word chat in this context means anything that can be done via messages will be done via messages. To deal with these messages we have built a service that facilitates the sending of messages and receiving status updates and incoming messages from the users.
 
-I want to break this down into two parts
+I want to break this post down into two parts
  - Scaling Challenges in Sending messages.
  - Scaling Challenges in Webhooks system.
 
+<br>
 
 > A webhook is an api request sent to us by whatsapp when a message is sent, delivered, read or failed. We use these webhooks to update the status of the message in our database and to relay this information to our internal systems like CRM, Bot etc.
 
@@ -31,7 +32,7 @@ parameters:
  - type: [bulk, normal] default: normal
 
 body:
-  - file_url: A CSV file contains list of phone numbers
+  - fileURL: A CSV file contains list of phone numbers
   message: A JSON object containing the message content
 
 Code for this is pretty simple
@@ -39,39 +40,47 @@ Code for this is pretty simple
 
 async function sendMessageApi(request, reply) {
 
-	const { type, file_url, message: data} = request.body;
+	const { type, fileURL, messageContent} = request.body;
+	const job = Jobs.create({ type, fileURL, data });
 	if (type === 'bulk') {
-		await addJobToQueue('messages:bulk', 'send_bulk_messages', { file_url, data });
+		await addJobToQueue('messages:bulk', 'send_bulk_messages', job.id);
 	} else {
-		await addJobToQueue('messages', 'send_message', { data });
+		await addJobToQueue('messages', 'send_message', job.id);
 	}
 	reply.send({ok: true});
 }
 
 
-async function sendMessageJob(data) {
-	const { phone, message } = data;
-	
+async function sendMessageJob(jobId) {
+	const job = await Jobs.findById(jobId);
+	const { phone, message } = job.data;	
 	// api call to whatsapp
 }
 
-async function sendBulkMessagesJob(data) {
-	const { file_url, message } = data;
-	const phones = await fetchPhones(file_url);
+async function sendBulkMessagesJob(jobId) {
+	const jobData = await Jobs.findById(jobId);
+	if (!jobData){
+		logger.error('Job not found, id: %', jobId);
+		return;
+	}
+	const phones = await fetchPhones(jobData.fileURL);
 	phones.forEach(async function(phone){
-		sendMessageJob({ phone, message });
+		await sendMessageJob(phone, jobData.messageContent);
 	});
 }
 ```
- - We are using bullMQ for queuing the jobs.
+ - We are using bullMQ for queuing the jobs in the background.
  - We are not sending the messages synchronously as it can overwhelm the main server.
  - Also our bulk API supports sending of 500k messages in a single request which would take a lot of time to process synchronously.
 
 
 This would easily scale & we still have no problem with this type of architecture for single messages, but for bulk messages there is a lot of scope for improvement.
 
->**📢 Quick refresher on pub-sub**
-A pub sub system consists of three components a publisher, subscriber and a broker. Publisher publishes the messages(don't confuse it with message we send to user on whatsapp) broker takes this messages and delivers it to the subscribers. This mechanism in our case is powered by [bullmq](https://docs.bullmq.io/) that uses redis as a broker.
+>**📢 Quick refresher on background processing** <br>
+In web servers, synchronous processing handles requests and responds immediately, like Instagram's post API. However, APIs that require extensive processing, such as YouTube's video upload API, can't be handled this way.<br>
+Background processing queues jobs and sends an "accepted" response to the client. The job is processed asynchronously, and the client may check its status later if the server provides an API for this purpose. This approach often uses distributed messaging queues like RabbitMQ, Kafka, or BullMQ. <br>
+We're using BullMQ to do the same for our send message API.
+
 
 Every Messaging Queue(MQ) out there have a basic property.
  - Atleast once delivery.
@@ -107,16 +116,16 @@ The more the phone numbers, more are the chances of this problem to occur as lar
 First thing we can do to solve this is configuring bigger timeout for this job.
 
 ```js
-await addJobToQueue('messages:bulk', 'process_bulk_job', data, { timeout: 300 }) // 300 seconds
+await addJobToQueue('messages:bulk', 'send_bulk_messages', data, { timeout: 300 }) // 300 seconds
 ```
 
 But this only solves for the timeout re-delivery problem that too assuming it finishes under 300 seconds.
-If for some reason re-delivery happened after 300 seconds we will still sitting ducks.
+If for some reason re-delivery happened after 300 seconds we will still be sitting ducks.
 
 **Idempotency**
 An operation is idempotent if it has the same result no matter how many times it's applied.
 
-To make our processing idempotency we can introduce a parameter in our jobData document or relation `isProcessed`, we will mark this value as `true` once all the messages are sent and at the start of process job we will check if this value is true or false if it's true we will terminate the job.
+To make our sendBulkMessagesJob idempotent we can introduce a parameter in our jobData document or relation `isProcessed`, we will mark this value as `true` once all the messages are sent and at the start of job we will check if this value is true or false if it's true we will terminate the job.
 
 ```js
 async function sendBulkMessagesJob(jobId: string): Promise<void> {
@@ -178,8 +187,7 @@ With this we finally would be able to avoid all the problems of re-delivery, the
 
 To solve for these rare cases though you can employ the idempotency at sendMessage level as well and only allow sending the messages that are still in pending state, as you will be updating the message status on each successful api call. <br>
 
-
-**Beginner's guide to webhooks system**
+## Beginner's guide to webhooks system 
 
 A webhook is a way of communicating b/w servers. There are two server one is a publisher server that obviously publishes the messages and other is a subscriber server that subscribes to the webhooks.
 
